@@ -100,7 +100,7 @@ export default function TagsScreen() {
           icon={Plus}
           label={t.newTag}
           disabled={tags !== undefined && tags.length >= MAX_TAGS}
-          className="size-14 rounded-full shadow-lg shadow-black/20"
+          className="size-14 rounded-full shadow-lg shadow-black/20 sm:size-14"
           onPress={() => openEditor("new")}
         />
       </View>

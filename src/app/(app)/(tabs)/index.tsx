@@ -182,7 +182,7 @@ export default function NoteListScreen() {
             size="icon"
             icon={Plus}
             label={s.newNote}
-            className="size-14 rounded-full shadow-lg shadow-black/20"
+            className="size-14 rounded-full shadow-lg shadow-black/20 sm:size-14"
             onPress={() => open()}
           />
         </View>
