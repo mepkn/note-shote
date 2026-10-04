@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 4%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 4%;
+    /* Pastel sky blue for fills, navy text on top; --brand is the same hue
+       deep enough to read as text on the light background. */
+    --primary: 210 85% 76%;
+    --primary-foreground: 220 55% 18%;
+    --brand: 212 60% 42%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 42%;
+    --accent: 240 5% 94%;
+    --accent-foreground: 240 6% 10%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 210 85% 66%;
+    --radius: 0.75rem;
+  }
+
+  .dark:root {
+    --background: 240 10% 4%;
+    --foreground: 0 0% 98%;
+    --card: 240 6% 8%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 6% 8%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 210 85% 78%;
+    --primary-foreground: 220 55% 13%;
+    --brand: 210 85% 78%;
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 240 4% 18%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 63% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 4% 18%;
+    --input: 240 4% 18%;
+    --ring: 210 85% 70%;
+  }
+}
+
+/* Web: Tailwind's preflight removes list markers; bring them back for rendered
+   Markdown (CmpMarkdown sets data-testid="markdown"). Task lists keep none. */
+[data-testid="markdown"] ul { list-style-type: disc; }
+[data-testid="markdown"] ul ul { list-style-type: circle; }
+[data-testid="markdown"] ul ul ul { list-style-type: square; }
+[data-testid="markdown"] ol { list-style-type: decimal; }
+[data-testid="markdown"] li:has(> input[type="checkbox"]) { list-style-type: none; }
+[data-testid="markdown"] li::marker { color: hsl(var(--muted-foreground)); }
