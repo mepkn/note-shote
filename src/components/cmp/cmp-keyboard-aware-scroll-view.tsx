@@ -1,4 +1,6 @@
 import { cssInterop } from "nativewind";
+import type { Ref } from "react";
+import type { ScrollView } from "react-native";
 import {
   KeyboardAwareScrollView,
   type KeyboardAwareScrollViewProps,
@@ -11,7 +13,9 @@ const StyledKeyboardAwareScrollView = cssInterop(KeyboardAwareScrollView, {
   KeyboardAwareScrollViewProps & { className?: string; contentContainerClassName?: string }
 >;
 
-type Props = React.ComponentProps<typeof StyledKeyboardAwareScrollView>;
+type Props = React.ComponentProps<typeof StyledKeyboardAwareScrollView> & {
+  ref?: Ref<ScrollView>;
+};
 
 // A ScrollView that scrolls the focused field above the keyboard. For form
 // screens; lists and full-height editors don't use it.
