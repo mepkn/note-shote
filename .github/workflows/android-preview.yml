@@ -1,0 +1,60 @@
+# Builds the preview APK on a GitHub runner and saves it as a workflow
+# artifact named after the commit (kept 90 days, visible only to signed-in
+# GitHub users). Started by hand: Actions tab → Android preview APK → Run
+# workflow, or `gh workflow run android-preview.yml`.
+#
+# It runs `eas build --local`, so it uses no EAS cloud build quota; EAS still
+# supplies the signing key and the preview environment's variables. Needs the
+# EXPO_TOKEN repository secret.
+name: Android preview APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-preview
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build APK
+        id: build
+        run: |
+          short=$(git rev-parse --short HEAD)
+          out="dist/${{ github.event.repository.name }}-preview-$short.apk"
+          mkdir -p dist
+          npx --yes eas-cli@latest build --platform android --profile preview \
+            --local --non-interactive --output "$out"
+          echo "apk=$out" >> "$GITHUB_OUTPUT"
+          echo "short=$short" >> "$GITHUB_OUTPUT"
+
+      - name: Save APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.repository.name }}-preview-${{ steps.build.outputs.short }}
+          path: ${{ steps.build.outputs.apk }}
+          retention-days: 90
+          if-no-files-found: error
