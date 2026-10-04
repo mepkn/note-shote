@@ -26,8 +26,7 @@ Platforms: web (static export on the VPS) and Android (sideloaded APK).
 
 Expo (SDK 57) · Expo Router · TypeScript · NativeWind + React Native Reusables ·
 Convex (database, auth, search, cron) · Convex Auth (password) ·
-`react-native-enriched-markdown` 1.1 (rendering and the Android editor) ·
-`react-native-keyboard-controller` (keyboard handling).
+`react-native-enriched-markdown` 1.1 (rendering and the Android editor).
 
 ## Development
 
@@ -145,7 +144,6 @@ adb install -r dist/note-shote-preview-*.apk
 ## How it works
 
 - **The app** (`src/`) uses Expo Router, NativeWind and React Native Reusables. The RNR primitives live in `src/components/ui/`, and screens only use the app's own wrappers in `src/components/cmp/cmp-*.tsx` (plus composites built from them: `note-row`, `tag-picker`, `auth-form`). All strings are in `src/lib/strings.ts`.
-- **Keyboard** (`react-native-keyboard-controller`, `KeyboardProvider` in the root layout). The sign-in and sign-up form scrolls the focused field above the keyboard (`CmpKeyboardAwareScrollView`). The note screen pads its bottom by the keyboard height (`CmpKeyboardPadding`), so the editor, format toolbar and status line sit above it. Dialogs rise by half the keyboard height (`components/ui/dialog.tsx`), which keeps them centred in the space above it; on web the keyboard height is 0, so nothing moves.
 - **Convex** (`convex/`) is the entire backend.
   - `schema.ts`: `notes`, `tags`, `noteTags` (the join table mirroring `notes.tagIds`), plus the Convex Auth tables.
   - `auth.ts`: Convex Auth with the Password provider. `profile()` runs for sign-up and sign-in before anything is stored and refuses emails not in `ALLOWED_EMAILS` with a generic `notAllowed`. `lib/access.ts` `requireUserId` re-checks the list on every call, so removing an email also ends that user's sessions. `getOwnedNote` / `getOwnedTag` give the same error for missing and foreign ids.
