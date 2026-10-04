@@ -15,13 +15,14 @@ import {
   Undo2,
 } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
+import { Platform, Pressable, ScrollView, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { MAX_BODY_BYTES, MAX_TITLE_CHARS } from "@convex/lib/limits";
 import { CmpButton } from "@/components/cmp/cmp-button";
 import { CmpConfirmDialog } from "@/components/cmp/cmp-confirm-dialog";
+import { CmpKeyboardPadding } from "@/components/cmp/cmp-keyboard-padding";
 import { CmpMarkdown } from "@/components/cmp/cmp-markdown";
 import { CmpNoteEditor } from "@/components/cmp/cmp-note-editor";
 import { CmpText } from "@/components/cmp/cmp-text";
@@ -30,7 +31,6 @@ import { TagPicker } from "@/components/tag-picker";
 import { errorMessage } from "@/lib/errors";
 import { canEditRich } from "@/lib/markdown-compat";
 import { strings } from "@/lib/strings";
-import { useKeyboardInset } from "@/lib/use-keyboard-inset";
 import { useNote, type SyncStatus } from "@/lib/use-note";
 import { cn } from "@/lib/utils";
 
@@ -58,7 +58,6 @@ export default function NoteScreen() {
   const [initialId] = useState(() => (params.id || undefined) as Id<"notes"> | undefined);
   const onCreated = useCallback((id: Id<"notes">) => router.setParams({ id }), []);
   const n = useNote(initialId, onCreated);
-  const keyboardInset = useKeyboardInset();
   const id = n.id;
 
   const [editing, setEditing] = useState(initialId === undefined);
@@ -197,10 +196,8 @@ export default function NoteScreen() {
   return (
     <SafeAreaView edges={["bottom"]} className="bg-background flex-1">
       <Stack.Screen options={{ headerTitle: "", headerRight }} />
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ paddingBottom: keyboardInset }}>
+      {/* The editor, toolbar and status line sit above the keyboard. */}
+      <CmpKeyboardPadding>
         <View className="mx-auto w-full max-w-3xl flex-1">
           <TextInput
             value={n.title}
@@ -269,7 +266,7 @@ export default function NoteScreen() {
             )}
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </CmpKeyboardPadding>
 
       {id && note && (
         <TagPicker

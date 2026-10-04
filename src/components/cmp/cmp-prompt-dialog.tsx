@@ -43,9 +43,9 @@ function PromptBody({
   onSubmit,
 }: Props) {
   const [value, setValue] = useState(initialValue);
-  // Width matches the alert dialogs; the bottom margin lifts it above the keyboard.
+  // Width matches the alert dialogs. The dialog rises above the keyboard by itself.
   return (
-    <DialogContent className="mb-[40vh] w-[83vw]">
+    <DialogContent className="w-[83vw]">
       <DialogHeader className="text-left">
         <DialogTitle>{title}</DialogTitle>
       </DialogHeader>

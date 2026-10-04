@@ -5,7 +5,8 @@ import * as DialogPrimitive from '@rn-primitives/dialog';
 import { X } from 'lucide-react-native';
 import * as React from 'react';
 import { Platform, Text, View, type GestureResponderEvent, type ViewProps } from 'react-native';
-import { FadeIn, FadeOut, ReduceMotion } from 'react-native-reanimated';
+import { FadeIn, FadeOut, ReduceMotion, useAnimatedStyle } from 'react-native-reanimated';
+import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import { FullWindowOverlay as RNFullWindowOverlay } from 'react-native-screens';
 
 const Dialog = DialogPrimitive.Root;
@@ -27,6 +28,10 @@ function DialogOverlay({
   children?: React.ReactNode;
 }) {
   const { onOpenChange } = DialogPrimitive.useRootContext();
+  // Local change: the dialog is centred, so rising by half the keyboard's
+  // height keeps it centred in the space above the keyboard. 0 on web.
+  const { height } = useReanimatedKeyboardAnimation();
+  const keyboardShift = useAnimatedStyle(() => ({ transform: [{ translateY: height.value / 2 }] }));
 
   function onOverlayPress(event: GestureResponderEvent) {
     onPress?.(event);
@@ -53,6 +58,7 @@ function DialogOverlay({
           exiting={FadeOut.duration(150).reduceMotion(ReduceMotion.System)}
           as="Pressable">
           <NativeOnlyAnimatedView
+            style={keyboardShift}
             entering={FadeIn.delay(50).reduceMotion(ReduceMotion.System)}
             exiting={FadeOut.duration(150).reduceMotion(ReduceMotion.System)}>
             <>{children}</>
