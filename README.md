@@ -183,9 +183,6 @@ Loading Markdown into it parses with md4c and keeps only those; `getMarkdown()` 
 `src/lib/roundtrip-sample.ts` covers every GFM feature, and the dev-only `/roundtrip` screen loads
 it into the input, serializes it and shows each line before → after.
 
-**Status: confirmed on a Samsung SM-E066B** (development build, library 1.1.0). Output of
-`getMarkdown()` after loading the sample:
-
 | Feature | Survives? |
 |---|---|
 | `#`–`######` headings, paragraphs | Yes (a blank line is added between adjacent headings) |
@@ -208,8 +205,3 @@ a body containing fenced or indented code, tables, blockquotes, task lists, mult
 items, thematic breaks, images, inline code, HTML, backslash escapes or setext headings is edited
 as raw Markdown (the web editor), with a notice. The rich editor also only reports changes while
 it's focused, so merely opening a note never rewrites it.
-
-## Not in v1
-
-Sharing or public links, checklist editing, images and attachments, offline edits, version
-history, folders, math, video, iOS builds. The optional Android share target was not built.
