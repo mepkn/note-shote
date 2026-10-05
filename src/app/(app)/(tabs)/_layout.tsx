@@ -31,7 +31,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          headerTitle: strings.tabs.notes,
+          headerTitle: strings.appName,
           tabBarLabel: strings.tabs.notes,
           tabBarIcon: ({ color, size }) => <NotebookText color={color} size={size} />,
         }}

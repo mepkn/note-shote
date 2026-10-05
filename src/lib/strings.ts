@@ -1,6 +1,6 @@
 // Every user-facing string, in one place. English only.
 export const strings = {
-  appName: "note-shote",
+  appName: "Note Shote",
   somethingWentWrong: "Something went wrong. Please try again.",
   cancel: "Cancel",
   retry: "Try again",
