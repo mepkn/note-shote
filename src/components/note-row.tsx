@@ -7,7 +7,7 @@ import { CmpText } from "@/components/cmp/cmp-text";
 import { relativeTime } from "@/lib/format";
 import { strings } from "@/lib/strings";
 
-export type NoteSummary = FunctionReturnType<typeof api.notes.pinned>[number];
+export type NoteSummary = FunctionReturnType<typeof api.notes.list>["page"][number];
 
 type Props = {
   note: NoteSummary;

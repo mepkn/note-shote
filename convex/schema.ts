@@ -24,13 +24,14 @@ export default defineSchema({
     .index("by_deleted", ["deletedAt"])
     .searchIndex("search_text", {
       searchField: "searchText",
-      filterFields: ["userId", "archived", "deletedAt"],
+      filterFields: ["userId"],
     }),
 
   // Names are unique per user ignoring case, stored trimmed.
   tags: defineTable({
     userId: v.id("users"),
     name: v.string(),
+    noteCount: v.number(), // its noteTags rows, kept by lib/tagLinks.ts
   }).index("by_user_name", ["userId", "name"]),
 
   // Mirrors notes.tagIds so a tag's notes can be found through an index.

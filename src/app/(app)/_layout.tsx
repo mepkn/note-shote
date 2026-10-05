@@ -9,6 +9,7 @@ export default function AppLayout() {
     <Stack screenOptions={{ headerTitleAlign: "left", title: strings.appName }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="note" />
+      <Stack.Screen name="tag" />
       <Stack.Screen name="settings" options={{ headerTitle: strings.settings.title }} />
     </Stack>
   );

@@ -25,17 +25,16 @@ export const strings = {
   list: {
     views: { notes: "Notes", archive: "Archive", trash: "Trash" },
     search: "Search notes",
-    allTags: "All",
     newNote: "New note",
     settings: "Settings",
     untitled: "Untitled",
     pinned: "Pinned",
     loading: "Loading…",
-    loadMore: "Load more",
     emptyNotes: "No notes yet. Tap + to write one.",
     emptyArchive: "Nothing archived.",
     emptyTrash: "The trash is empty.",
     noResults: "No notes match your search.",
+    searchHint: "Searches every note, including Archive and Trash, by whole words and word starts.",
     emptyTrashButton: "Empty trash",
     emptyTrashTitle: "Empty the trash?",
     emptyTrashDescription: "Every note in the trash is deleted forever. This can't be undone.",
@@ -89,7 +88,7 @@ export const strings = {
     },
   },
 
-  tabs: { notes: "Notes", tags: "Tags" },
+  tabs: { notes: "Notes", tags: "Tags", search: "Search" },
 
   tags: {
     title: "Tags",
@@ -104,6 +103,8 @@ export const strings = {
     deleteDescription: "It's removed from its notes. The notes stay.",
     count: (n: number) => (n === 1 ? "1 note" : `${n} notes`),
     done: "Done",
+    emptyTag: "No notes have this tag.",
+    tagNotFound: "This tag doesn't exist or was deleted.",
   },
 
   settings: {

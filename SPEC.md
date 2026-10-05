@@ -16,9 +16,10 @@ scripts and conventions** wherever this spec doesn't say otherwise. Before start
   - Pinned notes first, then the rest by `updatedAt`, newest first.
   - Each row shows the title (or the first line of the body if there's no title), a short plain-text
     preview, tags and the relative edit time.
-  - A search box (server-side, see Data model).
-  - A tag filter: chips, one tag at a time, plus "All".
-  - Views: **Notes**, **Archive** and **Trash**.
+  - Views: **Notes**, **Archive** and **Trash**. Tags and search live in their own tabs.
+- **Tabs:** Notes, Tags, Search. A labelled left sidebar from 768px wide; settings is a header gear.
+- **Search tab:** server-side, over every note including Archive and Trash, paginated.
+- **Tag screen:** from the Tags tab; every note with the tag, in any view, paginated.
   - A "New note" button.
 - **A note:**
   - The title is a single-line plain input. The body is Markdown.
@@ -129,7 +130,7 @@ notes: defineTable({
   .index("by_deleted", ["deletedAt"])
   .searchIndex("search_text", {
     searchField: "searchText",
-    filterFields: ["userId", "archived", "deletedAt"],
+    filterFields: ["userId"],
   }),
 
 tags: defineTable({
@@ -151,16 +152,16 @@ noteTags: defineTable({                   // mirrors notes.tagIds, as in yaad-di
 - The list query pages over `by_user_state_updated` (`usePaginatedQuery`). Sort pinned notes to the
   top with a separate small query (pinned, not archived, not deleted) rather than a second sort key.
   If that's awkward, add a `pinned` field to the index; pick one and explain it in the README.
-- Filtering by tag uses `noteTags.by_tag`, then loads the notes.
-- Search uses `search_text`, filtered by user and state, relevance-ordered, first 50 results.
+- A tag's notes page through `noteTags.by_tag`, then load each note.
+- Search uses `search_text`, filtered by user only, relevance-ordered, paginated.
 - Purging the trash: `crons.ts` runs daily. It reads `by_deleted` for `deletedAt < now - 30 days` in
   batches and deletes the notes and their `noteTags` rows, rescheduling itself while there are more.
 
 ## Convex API
 
-- `notes.list({ view: "notes" | "archive" | "trash", tagId?, paginationOpts })` query
-- `notes.pinned()` query
-- `notes.search({ query, view })` query
+- `notes.list({ view: "notes" | "archive" | "trash", paginationOpts })` query (pinned first in Notes)
+- `notes.byTag({ tagId, paginationOpts })` query
+- `notes.search({ query, paginationOpts })` query
 - `notes.get({ id })` query
 - `notes.create({ title?, body?, tagIds? })` mutation → `{ _id }`
 - `notes.save({ id, title, body, baseVersion })` mutation → `{ version }`. Last write wins.

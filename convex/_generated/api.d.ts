@@ -15,6 +15,7 @@ import type * as lib_access from "../lib/access.js";
 import type * as lib_allowlist from "../lib/allowlist.js";
 import type * as lib_limits from "../lib/limits.js";
 import type * as lib_preview from "../lib/preview.js";
+import type * as lib_tagLinks from "../lib/tagLinks.js";
 import type * as notes from "../notes.js";
 import type * as tags from "../tags.js";
 import type * as users from "../users.js";
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   "lib/allowlist": typeof lib_allowlist;
   "lib/limits": typeof lib_limits;
   "lib/preview": typeof lib_preview;
+  "lib/tagLinks": typeof lib_tagLinks;
   notes: typeof notes;
   tags: typeof tags;
   users: typeof users;

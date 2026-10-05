@@ -1,7 +1,8 @@
 import { useMutation, useQuery } from "convex/react";
 import { Pencil, Plus, Trash2 } from "lucide-react-native";
+import { router } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, FlatList, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, View } from "react-native";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { MAX_TAGS } from "@convex/lib/limits";
@@ -65,14 +66,17 @@ export default function TagsScreen() {
           }
           renderItem={({ item: tag }) => (
             <View className="border-border bg-card flex-row items-center gap-2 rounded-xl border py-2 pl-4 pr-2">
-              <View className="flex-1">
+              <Pressable
+                className="flex-1 py-1"
+                accessibilityRole="link"
+                onPress={() => router.push({ pathname: "/tag", params: { id: tag._id } })}>
                 <CmpText className="text-base font-semibold" numberOfLines={1}>
                   {tag.name}
                 </CmpText>
                 <CmpText variant="muted" className="text-xs">
                   {t.count(tag.count)}
                 </CmpText>
-              </View>
+              </Pressable>
               <CmpButton
                 variant="ghost"
                 size="icon"

@@ -50,13 +50,13 @@ describe("allowlist", () => {
     const t = newTest();
     const alice = await signedInUser(t, "alice@example.com");
     vi.stubEnv("ALLOWED_EMAILS", "");
-    await expect(alice.as.query(api.notes.pinned, {})).rejects.toThrow("notAllowed");
+    await expect(alice.as.query(api.tags.list, {})).rejects.toThrow("notAllowed");
   });
 
   test("a signed-in user whose email isn't allowed is refused", async () => {
     const t = newTest();
     const mallory = await signedInUser(t, "mallory@example.com");
-    await expect(mallory.as.query(api.notes.pinned, {})).rejects.toThrow("notAllowed");
+    await expect(mallory.as.query(api.tags.list, {})).rejects.toThrow("notAllowed");
     await expect(mallory.as.mutation(api.notes.create, {})).rejects.toThrow("notAllowed");
     await expect(mallory.as.query(api.tags.list, {})).rejects.toThrow("notAllowed");
     await expect(mallory.as.query(api.users.me, {})).rejects.toThrow("notAllowed");
@@ -78,7 +78,7 @@ describe("allowlist", () => {
 
   test("anonymous callers are refused", async () => {
     const t = newTest();
-    await expect(t.query(api.notes.pinned, {})).rejects.toThrow("notAuthenticated");
+    await expect(t.query(api.tags.list, {})).rejects.toThrow("notAuthenticated");
     await expect(t.mutation(api.notes.create, {})).rejects.toThrow("notAuthenticated");
   });
 });
@@ -126,7 +126,7 @@ describe("ownership", () => {
       tagNotFound,
     );
     await expect(
-      alice.as.query(api.notes.list, { view: "notes", tagId: bobTag, paginationOpts: page }),
+      alice.as.query(api.notes.byTag, { tagId: bobTag, paginationOpts: page }),
     ).rejects.toThrow(tagNotFound);
     await expect(alice.as.mutation(api.tags.rename, { id: bobTag, name: "x" })).rejects.toThrow(
       tagNotFound,
@@ -137,8 +137,12 @@ describe("ownership", () => {
     // Lists and search only show A's own notes.
     const list = await alice.as.query(api.notes.list, { view: "notes", paginationOpts: page });
     expect(list.page.map((n) => n._id)).toEqual([aliceNote]);
-    expect(await alice.as.query(api.notes.search, { query: "zebra", view: "notes" })).toEqual([]);
-    expect(await bob.as.query(api.notes.search, { query: "zebra", view: "notes" })).toHaveLength(1);
+    expect(
+      (await alice.as.query(api.notes.search, { query: "zebra", paginationOpts: page })).page,
+    ).toEqual([]);
+    expect(
+      (await bob.as.query(api.notes.search, { query: "zebra", paginationOpts: page })).page,
+    ).toHaveLength(1);
 
     // Bob's note is unchanged.
     const got = await bob.as.query(api.notes.get, { id: bobNote });
@@ -217,10 +221,12 @@ describe("saving", () => {
       baseVersion: 1,
     });
     expect(await searchText()).toBe("Cherry\ndate");
-    expect(await alice.as.query(api.notes.search, { query: "cherry", view: "notes" })).toHaveLength(
-      1,
-    );
-    expect(await alice.as.query(api.notes.search, { query: "banana", view: "notes" })).toEqual([]);
+    expect(
+      (await alice.as.query(api.notes.search, { query: "cherry", paginationOpts: page })).page,
+    ).toHaveLength(1);
+    expect(
+      (await alice.as.query(api.notes.search, { query: "banana", paginationOpts: page })).page,
+    ).toEqual([]);
   });
 
   test("titles are single-line", async () => {
@@ -232,7 +238,7 @@ describe("saving", () => {
 });
 
 describe("views", () => {
-  test("pinned notes are listed separately, archive and trash keep their own lists", async () => {
+  test("pinned notes lead the Notes list, archive and trash keep their own lists", async () => {
     const t = newTest();
     const alice = await signedInUser(t, "alice@example.com");
     const make = async (title: string) =>
@@ -247,14 +253,13 @@ describe("views", () => {
 
     const ids = async (view: "notes" | "archive" | "trash") =>
       (await alice.as.query(api.notes.list, { view, paginationOpts: page })).page.map((n) => n._id);
-    expect(await ids("notes")).toEqual([a]);
-    expect((await alice.as.query(api.notes.pinned, {})).map((n) => n._id)).toEqual([b]);
+    expect(await ids("notes")).toEqual([b, a]);
     expect(await ids("archive")).toEqual([c]);
     expect(await ids("trash")).toEqual([d]);
 
     // Archiving unpins; pinning unarchives.
     await alice.as.mutation(api.notes.setArchived, { id: b, archived: true });
-    expect(await alice.as.query(api.notes.pinned, {})).toEqual([]);
+    expect(await ids("notes")).toEqual([a]);
     await alice.as.mutation(api.notes.setPinned, { id: c, pinned: true });
     expect(await ids("archive")).toEqual([b]);
   });
@@ -277,32 +282,58 @@ describe("views", () => {
     }
   });
 
-  test("tag filter and search respect the view", async () => {
+  test("a tag and search cover every view, trash included", async () => {
     const t = newTest();
     const alice = await signedInUser(t, "alice@example.com");
     const tag = await alice.as.mutation(api.tags.create, { name: "Work" });
-    const { _id: live } = await alice.as.mutation(api.notes.create, {
-      body: "quarterly report",
-      tagIds: [tag],
-    });
-    const { _id: gone } = await alice.as.mutation(api.notes.create, {
-      body: "old report",
-      tagIds: [tag],
-    });
+    const make = async (body: string) =>
+      (await alice.as.mutation(api.notes.create, { body, tagIds: [tag] }))._id;
+    const live = await make("quarterly report");
+    const kept = await make("archived report");
+    const gone = await make("old report");
+    await alice.as.mutation(api.notes.setArchived, { id: kept, archived: true });
     await alice.as.mutation(api.notes.trash, { id: gone });
 
-    const byTag = async (view: "notes" | "trash") =>
-      (await alice.as.query(api.notes.list, { view, tagId: tag, paginationOpts: page })).page.map(
-        (n) => n._id,
-      );
-    expect(await byTag("notes")).toEqual([live]);
-    expect(await byTag("trash")).toEqual([gone]);
+    const byTag = await alice.as.query(api.notes.byTag, { tagId: tag, paginationOpts: page });
+    expect(byTag.page.map((n) => n._id)).toEqual([gone, kept, live]);
 
-    const search = async (view: "notes" | "trash") =>
-      (await alice.as.query(api.notes.search, { query: "report", view })).map((n) => n._id);
-    expect(await search("notes")).toEqual([live]);
-    expect(await search("trash")).toEqual([gone]);
-    expect(await alice.as.query(api.notes.search, { query: "  ", view: "notes" })).toEqual([]);
+    const found = await alice.as.query(api.notes.search, { query: "report", paginationOpts: page });
+    expect(found.page.map((n) => n._id).sort()).toEqual([live, kept, gone].sort());
+    expect(
+      (await alice.as.query(api.notes.search, { query: "  ", paginationOpts: page })).page,
+    ).toEqual([]);
+  });
+
+  test("tag and search results page through every match", async () => {
+    const t = newTest();
+    const alice = await signedInUser(t, "alice@example.com");
+    const tag = await alice.as.mutation(api.tags.create, { name: "Many" });
+    for (let i = 0; i < 7; i++) {
+      await alice.as.mutation(api.notes.create, { body: `report ${i}`, tagIds: [tag] });
+    }
+    async function all(
+      fetch: (
+        cursor: string | null,
+      ) => Promise<{ page: unknown[]; isDone: boolean; continueCursor: string }>,
+    ) {
+      let cursor: string | null = null;
+      let count = 0;
+      for (;;) {
+        const r = await fetch(cursor);
+        count += r.page.length;
+        if (r.isDone) return count;
+        cursor = r.continueCursor;
+      }
+    }
+    const small = (cursor: string | null) => ({ numItems: 3, cursor });
+    expect(
+      await all((c) => alice.as.query(api.notes.byTag, { tagId: tag, paginationOpts: small(c) })),
+    ).toBe(7);
+    expect(
+      await all((c) =>
+        alice.as.query(api.notes.search, { query: "report", paginationOpts: small(c) }),
+      ),
+    ).toBe(7);
   });
 });
 
@@ -325,7 +356,7 @@ describe("trash", () => {
     expect(trashed.pinned).toBe(false);
     // Pinning a trashed note does nothing.
     await alice.as.mutation(api.notes.setPinned, { id: _id, pinned: true });
-    expect(await alice.as.query(api.notes.pinned, {})).toEqual([]);
+    expect((await alice.as.query(api.notes.get, { id: _id })).pinned).toBe(false);
 
     await alice.as.mutation(api.notes.restore, { id: _id });
     expect((await alice.as.query(api.notes.get, { id: _id })).deletedAt).toBeUndefined();
@@ -423,5 +454,61 @@ describe("tags", () => {
     await alice.as.mutation(api.notes.setTags, { id: _id, tagIds: [b, b] });
     expect((await alice.as.query(api.notes.get, { id: _id })).tagIds).toEqual([b]);
     expect((await joinRows(t)).map((r) => r.tagId)).toEqual([b]);
+  });
+});
+
+describe("tag counts", () => {
+  test("noteCount follows tagging, untagging, trash and delete forever", async () => {
+    const t = newTest();
+    const alice = await signedInUser(t, "alice@example.com");
+    const a = await alice.as.mutation(api.tags.create, { name: "a" });
+    const b = await alice.as.mutation(api.tags.create, { name: "b" });
+    const counts = async () =>
+      Object.fromEntries((await alice.as.query(api.tags.list, {})).map((x) => [x.name, x.count]));
+
+    const { _id: n1 } = await alice.as.mutation(api.notes.create, { tagIds: [a, b] });
+    const { _id: n2 } = await alice.as.mutation(api.notes.create, { tagIds: [a] });
+    expect(await counts()).toEqual({ a: 2, b: 1 });
+
+    await alice.as.mutation(api.notes.setTags, { id: n1, tagIds: [b] });
+    expect(await counts()).toEqual({ a: 1, b: 1 });
+
+    // Trashed notes keep their tags (the tag screen shows them).
+    await alice.as.mutation(api.notes.trash, { id: n2 });
+    expect(await counts()).toEqual({ a: 1, b: 1 });
+    await alice.as.mutation(api.notes.deleteForever, { id: n2 });
+    expect(await counts()).toEqual({ a: 0, b: 1 });
+
+    await alice.as.mutation(api.notes.trash, { id: n1 });
+    await alice.as.mutation(api.notes.emptyTrash, {});
+    expect(await counts()).toEqual({ a: 0, b: 0 });
+  });
+
+  test("deleting a tag on more notes than one batch cleans up every note", async () => {
+    vi.useFakeTimers();
+    try {
+      const t = newTest();
+      const alice = await signedInUser(t, "alice@example.com");
+      const tag = await alice.as.mutation(api.tags.create, { name: "big" });
+      const keep = await alice.as.mutation(api.tags.create, { name: "keep" });
+      for (let i = 0; i < 230; i++) {
+        await alice.as.mutation(api.notes.create, { tagIds: [tag, keep] });
+      }
+      expect((await alice.as.query(api.tags.list, {})).map((x) => x.count)).toEqual([230, 230]);
+
+      await alice.as.mutation(api.tags.remove, { id: tag });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+      const rows = await joinRows(t);
+      expect(rows.every((r) => r.tagId === keep)).toBe(true);
+      expect(rows).toHaveLength(230);
+      const notes = await t.run((ctx) => ctx.db.query("notes").collect());
+      expect(notes.every((n) => n.tagIds.length === 1 && n.tagIds[0] === keep)).toBe(true);
+      expect(await alice.as.query(api.tags.list, {})).toEqual([
+        expect.objectContaining({ name: "keep", count: 230 }),
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

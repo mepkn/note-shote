@@ -10,6 +10,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { getOwnedNote, getOwnedTag, requireUserId } from "./lib/access";
+import { addTagLink, removeTagLink } from "./lib/tagLinks";
 import {
   MAX_BODY_BYTES,
   MAX_TAGS_PER_NOTE,
@@ -20,7 +21,6 @@ import {
 import { firstLine, preview } from "./lib/preview";
 
 const view = v.union(v.literal("notes"), v.literal("archive"), v.literal("trash"));
-type View = Infer<typeof view>;
 
 // What the list shows per note; the body stays on the server.
 const noteSummary = v.object({
@@ -48,13 +48,6 @@ const noteFull = v.object({
   updatedAt: v.number(),
 });
 
-const PINNED_LIMIT = 100;
-const SEARCH_LIMIT = 50;
-// Trash can't be expressed as a search filter (deletedAt is "any number"), so
-// trash search reads this many live+trashed matches and keeps the trashed ones.
-const TRASH_SEARCH_SCAN = 256;
-// A tag's notes are loaded in one go and sorted by updatedAt.
-const TAG_NOTES_LIMIT = 1000;
 const PURGE_BATCH = 100;
 const EMPTY_TRASH_BATCH = 100;
 
@@ -75,11 +68,6 @@ function summarize(note: Doc<"notes">) {
 function full(note: Doc<"notes">) {
   const { searchText: _searchText, userId: _userId, ...rest } = note;
   return rest;
-}
-
-function inView(note: Doc<"notes">, which: View): boolean {
-  if (which === "trash") return note.deletedAt !== undefined;
-  return note.deletedAt === undefined && note.archived === (which === "archive");
 }
 
 function normaliseTitle(title: string): string {
@@ -118,10 +106,10 @@ async function syncNoteTags(
     .take(MAX_TAGS_PER_NOTE * 2);
   for (const row of rows) {
     if (wanted.has(row.tagId)) wanted.delete(row.tagId);
-    else await ctx.db.delete("noteTags", row._id);
+    else await removeTagLink(ctx, row);
   }
   for (const tagId of wanted) {
-    await ctx.db.insert("noteTags", { userId, noteId, tagId });
+    await addTagLink(ctx, userId, noteId, tagId);
   }
 }
 
@@ -130,35 +118,17 @@ async function removeNote(ctx: MutationCtx, note: Doc<"notes">): Promise<void> {
     .query("noteTags")
     .withIndex("by_note", (q) => q.eq("noteId", note._id))
     .take(MAX_TAGS_PER_NOTE * 2);
-  for (const row of rows) await ctx.db.delete("noteTags", row._id);
+  for (const row of rows) await removeTagLink(ctx, row);
   await ctx.db.delete("notes", note._id);
 }
 
+// One view, paginated. Notes lists pinned notes first: the index orders
+// pinned (true after false) before updatedAt, and the range is descending.
 export const list = query({
-  args: { view, tagId: v.optional(v.id("tags")), paginationOpts: paginationOptsValidator },
+  args: { view, paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(noteSummary),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-
-    if (args.tagId !== undefined) {
-      // One page with everything: pinned first (in Notes), then newest edits.
-      const tag = await getOwnedTag(ctx, userId, args.tagId);
-      const links = await ctx.db
-        .query("noteTags")
-        .withIndex("by_tag", (q) => q.eq("tagId", tag._id))
-        .take(TAG_NOTES_LIMIT);
-      const notes: Doc<"notes">[] = [];
-      for (const link of links) {
-        const note = await ctx.db.get("notes", link.noteId);
-        if (note !== null && note.userId === userId && inView(note, args.view)) notes.push(note);
-      }
-      notes.sort(
-        (a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt,
-      );
-      return { page: notes.map(summarize), isDone: true, continueCursor: "" };
-    }
-
-    // Pinned notes come from notes.pinned, so Notes pages only unpinned ones.
     const base = ctx.db.query("notes");
     const ranged =
       args.view === "trash"
@@ -169,60 +139,48 @@ export const list = query({
             q
               .eq("userId", userId)
               .eq("archived", args.view === "archive")
-              .eq("deletedAt", undefined)
-              .eq("pinned", false),
+              .eq("deletedAt", undefined),
           );
     const result = await ranged.order("desc").paginate(args.paginationOpts);
     return { ...result, page: result.page.map(summarize) };
   },
 });
 
-export const pinned = query({
-  args: {},
-  returns: v.array(noteSummary),
-  handler: async (ctx) => {
+// Every note with the tag, in any view (trashed ones included), most
+// recently tagged first. Pages through the noteTags join rows.
+export const byTag = query({
+  args: { tagId: v.id("tags"), paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(noteSummary),
+  handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    const notes = await ctx.db
-      .query("notes")
-      .withIndex("by_user_state_pinned_updated", (q) =>
-        q.eq("userId", userId).eq("archived", false).eq("deletedAt", undefined).eq("pinned", true),
-      )
+    const tag = await getOwnedTag(ctx, userId, args.tagId);
+    const result = await ctx.db
+      .query("noteTags")
+      .withIndex("by_tag", (q) => q.eq("tagId", tag._id))
       .order("desc")
-      .take(PINNED_LIMIT);
-    return notes.map(summarize);
+      .paginate(args.paginationOpts);
+    const page: ReturnType<typeof summarize>[] = [];
+    for (const link of result.page) {
+      const note = await ctx.db.get("notes", link.noteId);
+      if (note !== null && note.userId === userId) page.push(summarize(note));
+    }
+    return { ...result, page };
   },
 });
 
+// All of the caller's notes in every view, trash included, best match first.
 export const search = query({
-  args: { query: v.string(), view },
-  returns: v.array(noteSummary),
+  args: { query: v.string(), paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(noteSummary),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const text = args.query.trim();
-    if (!text) return [];
-    if (args.view === "trash") {
-      const hits = await ctx.db
-        .query("notes")
-        .withSearchIndex("search_text", (q) =>
-          q.search("searchText", text).eq("userId", userId).eq("archived", false),
-        )
-        .take(TRASH_SEARCH_SCAN);
-      return hits
-        .filter((n) => n.deletedAt !== undefined)
-        .slice(0, SEARCH_LIMIT)
-        .map(summarize);
-    }
-    const hits = await ctx.db
+    if (!text) return { page: [], isDone: true, continueCursor: "" };
+    const result = await ctx.db
       .query("notes")
-      .withSearchIndex("search_text", (q) =>
-        q
-          .search("searchText", text)
-          .eq("userId", userId)
-          .eq("archived", args.view === "archive")
-          .eq("deletedAt", undefined),
-      )
-      .take(SEARCH_LIMIT);
-    return hits.map(summarize);
+      .withSearchIndex("search_text", (q) => q.search("searchText", text).eq("userId", userId))
+      .paginate(args.paginationOpts);
+    return { ...result, page: result.page.map(summarize) };
   },
 });
 

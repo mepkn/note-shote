@@ -10,7 +10,10 @@ Platforms: web (static export on the VPS) and Android (sideloaded APK).
 
 - Note list: pinned notes first, then newest edit first. Title (or the body's first line),
   a plain-text preview, tags and the relative edit time.
-- Server-side search, a tag filter (one tag at a time, or All), and Notes / Archive / Trash views.
+- Tabs: Notes (Notes / Archive / Trash views), Tags and Search. Bottom tabs on phones; from 768px
+  wide a labelled sidebar on the left. The settings gear is in the Notes header.
+- Search tab: server-side search over every note (Archive and Trash included), paginated.
+- Tags tab: tap a tag to see all its notes in every view, paginated.
 - Notes open in view mode (rendered GFM). Tap Edit (or the body, on Android) to edit.
   - Android: rich editor with Markdown shortcuts (`# `, `- `, `1. `) and a format toolbar.
   - Web: raw Markdown in a monospace box; Preview switches back to the rendered view.
@@ -147,8 +150,8 @@ adb install -r dist/note-shote-preview-*.apk
 - **Convex** (`convex/`) is the entire backend.
   - `schema.ts`: `notes`, `tags`, `noteTags` (the join table mirroring `notes.tagIds`), plus the Convex Auth tables.
   - `auth.ts`: Convex Auth with the Password provider. `profile()` runs for sign-up and sign-in before anything is stored and refuses emails not in `ALLOWED_EMAILS` with a generic `notAllowed`. `lib/access.ts` `requireUserId` re-checks the list on every call, so removing an email also ends that user's sessions. `getOwnedNote` / `getOwnedTag` give the same error for missing and foreign ids.
-  - `notes.ts`: list, pinned, search, get, create, save (last write wins; `version` bumps, a stale `baseVersion` still saves), setTags, setPinned, setArchived, trash, restore, deleteForever, emptyTrash, and the internal `purgeTrash` run daily by `crons.ts`. `searchText` (`title + "\n" + body`) is rewritten on every save.
-  - `tags.ts`: list (with note counts), create, rename, remove. Names are trimmed and unique per user ignoring case.
+  - `notes.ts`: list, byTag, search, get, create, save (last write wins; `version` bumps, a stale `baseVersion` still saves), setTags, setPinned, setArchived, trash, restore, deleteForever, emptyTrash, and the internal `purgeTrash` run daily by `crons.ts`. `searchText` (`title + "\n" + body`) is rewritten on every save.
+  - `tags.ts`: list (with note counts), create, rename, remove. Names are trimmed and unique per user ignoring case. Counts are `tags.noteCount`, kept in step by `lib/tagLinks.ts` (every `noteTags` insert and delete goes through it), so listing tags never counts join rows. Removing a tag deletes it at once and clears its join rows and note `tagIds` in batches of 100.
   - `users.ts`: `me`, for the email in Settings.
 - **Sync** (`src/lib/use-note.ts`). Edits are saved 500 ms after typing stops, and immediately when a field loses focus. A subscription result is applied only while neither the title nor the body is focused and there are no unsaved or in-flight edits, so a remote value never lands in a focused editor; results older than the last saved version are ignored. `/note` without an id creates the note on the first save.
 - **Auth tokens** are kept in `expo-secure-store` on Android and `localStorage` on web.
@@ -156,22 +159,21 @@ adb install -r dist/note-shote-preview-*.apk
 ### Index design: pinned in the index
 
 The spec allowed either a separate pinned query over the spec'd index or adding `pinned` to it.
-`notes.pinned()` over `["userId","archived","deletedAt","updatedAt"]` would scan every live note
+A pinned query over `["userId","archived","deletedAt","updatedAt"]` would scan every live note
 to find the pinned ones, so the index is `by_user_state_pinned_updated`:
 `["userId", "archived", "deletedAt", "pinned", "updatedAt"]`. With two invariants every view is a
-single index range, ordered by `updatedAt`:
+single paginated index range; in Notes, descending order puts pinned notes first:
 
 - a pinned note is never archived (archiving unpins, pinning unarchives);
 - a trashed note is neither pinned nor archived (restoring it brings it back to Notes).
 
 | Query | Range |
 |---|---|
-| Notes (paginated) | `userId, archived=false, deletedAt=unset, pinned=false`, desc |
-| `pinned()` | `userId, archived=false, deletedAt=unset, pinned=true`, desc |
-| Archive | `userId, archived=true, deletedAt=unset, pinned=false`, desc |
+| Notes | `userId, archived=false, deletedAt=unset`, desc (pinned, then newest edit) |
+| Archive | `userId, archived=true, deletedAt=unset`, desc |
 | Trash | `userId, archived=false, deletedAt ≥ 0`, desc (most recently trashed first) |
-| Tag filter | `noteTags.by_tag`, then the notes; one page, pinned first then newest |
-| Search | `search_text` filtered by user/archived/deletedAt; trash search reads 256 matches and keeps trashed ones |
+| `byTag` | `noteTags.by_tag` desc, paginated, then each note; every view, most recently tagged first |
+| Search | `search_text` filtered by user only, paginated, best match first; every view |
 | Purge | `by_deleted`, `0 ≤ deletedAt < now − 30 days`, 100 per batch, reschedules while full |
 
 ## Editor round-trip
