@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { canEditRich, unsupportedFeatures } from "./markdown-compat";
+import { canEditRich, keepLineBreaks, unsupportedFeatures } from "./markdown-compat";
 
 describe("canEditRich", () => {
   test("accepts what the Android editor round-trips", () => {
@@ -38,5 +38,15 @@ describe("canEditRich", () => {
   ])("rejects %s", (name, md) => {
     expect(unsupportedFeatures(md)).toContain(name);
     expect(canEditRich(md)).toBe(false);
+  });
+});
+
+describe("keepLineBreaks", () => {
+  test("turns single newlines into hard breaks", () => {
+    expect(keepLineBreaks("a\nb\n\nc")).toBe("a  \nb\n\nc");
+  });
+  test("leaves fenced code and existing breaks alone", () => {
+    const md = "x  \ny\n```\ncode\nmore\n```\nz";
+    expect(keepLineBreaks(md)).toBe("x  \ny  \n```\ncode\nmore\n```\nz");
   });
 });

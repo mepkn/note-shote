@@ -35,3 +35,25 @@ export function unsupportedFeatures(markdown: string): string[] {
 export function canEditRich(markdown: string): boolean {
   return unsupportedFeatures(markdown).length === 0;
 }
+
+// Markdown joins lines split by a single newline into one paragraph, but in
+// the editor Enter means "new line". End each such line with two spaces (a
+// hard break) so the viewer keeps it. Fenced code is left as is.
+export function keepLineBreaks(markdown: string): string {
+  const lines = markdown.split("\n");
+  let fence: string | null = null;
+  return lines
+    .map((line, i) => {
+      const open = /^\s{0,3}(```|~~~)/.exec(line)?.[1];
+      if (open) {
+        if (!fence) fence = open;
+        else if (line.trim().startsWith(fence)) fence = null;
+        return line;
+      }
+      const next = lines[i + 1];
+      if (fence || next === undefined || !line.trim() || !next.trim()) return line;
+      if (/( {2}|\\)$/.test(line)) return line;
+      return `${line}  `;
+    })
+    .join("\n");
+}

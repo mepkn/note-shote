@@ -2,6 +2,7 @@ import { useColorScheme } from "nativewind";
 import { useMemo } from "react";
 import { Linking } from "react-native";
 import { EnrichedMarkdownText } from "react-native-enriched-markdown";
+import { keepLineBreaks } from "@/lib/markdown-compat";
 import { markdownStyle } from "@/lib/markdown-style";
 
 // underline: `_x_` means underline, matching what the Android editor writes.
@@ -18,7 +19,7 @@ export function CmpMarkdown({ markdown }: { markdown: string }) {
     <EnrichedMarkdownText
       flavor="github"
       testID="markdown"
-      markdown={markdown}
+      markdown={keepLineBreaks(markdown)}
       markdownStyle={style}
       md4cFlags={FLAGS}
       enableTaskListItemToggle={false}
