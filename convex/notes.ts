@@ -1,5 +1,5 @@
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
-import { ConvexError, v, type Infer } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import {

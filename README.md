@@ -4,7 +4,7 @@ A private Markdown notes app: many notes, each with a title, a Markdown body and
 live between an Android phone and the web at <https://note-shote.pknspace.com>. Only
 allowlisted emails can sign in.
 
-Platforms: web (static export on the VPS) and Android (sideloaded APK).
+Platforms: web (a separate Vite app in `web/`, on the VPS) and Android (sideloaded APK).
 
 ## Features
 
@@ -16,7 +16,9 @@ Platforms: web (static export on the VPS) and Android (sideloaded APK).
 - Tags tab: tap a tag to see all its notes in every view, paginated.
 - Notes open in view mode (rendered GFM). Tap Edit (or the body, on Android) to edit.
   - Android: rich editor with Markdown shortcuts (`# `, `- `, `1. `) and a format toolbar.
-  - Web: raw Markdown in a monospace box; Preview switches back to the rendered view.
+  - Web: three panes (sidebar with views and tags, note list, open note) from 768px wide;
+    phones show the list or the note. Raw Markdown in a monospace box; Preview switches back to
+    the rendered view. The open note's id is in the URL hash.
 - Autosave about 500 ms after typing stops, with a Saving… / Saved / Offline label.
 - Pin, archive, tags, copy Markdown, move to trash. Trash: restore, delete forever, empty trash.
   Notes in the trash for more than 30 days are deleted by a daily cron.
@@ -30,6 +32,7 @@ Platforms: web (static export on the VPS) and Android (sideloaded APK).
 Expo (SDK 57) · Expo Router · TypeScript · NativeWind + React Native Reusables ·
 Convex (database, auth, search, cron) · Convex Auth (password) ·
 `react-native-enriched-markdown` 1.1 (rendering and the Android editor).
+Web: React 19 · Vite · Tailwind CSS v4 · shadcn/ui (Base UI) · react-markdown + remark-gfm.
 
 ## Development
 
@@ -39,6 +42,7 @@ Requires Node 22.18+ (`.nvmrc` pins 22).
 
 ```sh
 npm install               # don't use --ignore-scripts: enriched-markdown's postinstall fetches native assets
+npm run web:install       # the web app's own node_modules
 npx convex dev            # first run: choose a local deployment (no account needed)
 ```
 
@@ -55,7 +59,7 @@ This writes `EXPO_PUBLIC_CONVEX_URL` to `.env.local`. Keep it running; it redepl
 
 ```sh
 npx @convex-dev/auth      # interactive: generates JWT_PRIVATE_KEY + JWKS
-npx convex env set SITE_URL http://localhost:8081
+npx convex env set SITE_URL http://localhost:5173
 npx convex env set ALLOWED_EMAILS you@example.com   # comma-separated; nobody else can sign up or sign in
 ```
 
@@ -66,7 +70,7 @@ npx convex env set ALLOWED_EMAILS you@example.com   # comma-separated; nobody el
 The Android editor is a native module, so Android needs a **development build** (not Expo Go).
 
 ```sh
-npm run web                      # browser
+npm run web:dev                  # web app on http://localhost:5173
 npm run android                  # build and install a development build on a USB phone
 npx expo start --dev-client      # Metro for the development build
 ```
@@ -76,16 +80,16 @@ npx expo start --dev-client      # Metro for the development build
 | Command | What it does |
 |---|---|
 | `npx convex dev` | Local Convex backend with hot reload |
-| `npm run web` | Metro for the browser |
+| `npm run web:install` | Install `web/` dependencies |
+| `npm run web:dev` | Vite dev server for the web app (reads `EXPO_PUBLIC_CONVEX_URL` from `.env.local`) |
 | `npm run android` | Build and install the development build on a USB phone |
 | `npm run typecheck` | App and `convex/` typecheck |
 | `npm run lint` | ESLint (Expo config) |
 | `npm test` | convex-test (allowlist, ownership, limits, versions, search, trash, purge, tags) and the editor-compat detector |
-| `npm run check` | Typecheck, lint and tests |
+| `npm run check` | Typecheck, lint and tests, then the web app's typecheck and lint |
 | `npm run icons` | Regenerate the app icon and splash images |
-| `npm run build:web` | Static web export into `dist/web/` |
 | `npm run deploy:backend` | Checks, then deploys `convex/` to production |
-| `npm run deploy:web` | Checks, exports the web app, rsyncs `dist/web/` to the VPS |
+| `npm run deploy:web` | Checks, builds `web/` with the production URL, rsyncs `web/dist/` to the VPS |
 | `npm run deploy:web:dry` | The same, but rsync only shows what would change |
 | `npm run build:android:preview` | Installable APK, built on EAS cloud |
 | `npm run build:android:preview:local` | The same APK, built on this Mac into `dist/` |
@@ -114,14 +118,12 @@ the VPS, and the Android app built with EAS under the personal Expo account.
   ```caddy
   http://note-shote.pknspace.com:8080 {
         root * /var/www/note-shote
-        try_files {path} {path}.html /index.html
+        try_files {path} /index.html
         encode gzip
         file_server
   }
   ```
 
-  `{path}.html` is needed because Expo's static export writes routes as `note.html` etc. The
-  note screen is `/note?id=…` (a fixed route, not `note/[id]`), so no extra rule is needed.
   A cloudflared Public Hostname maps `note-shote.pknspace.com` → `http://localhost:8080`.
 
 ### Backend
@@ -134,7 +136,7 @@ npm run deploy:backend    # checks, then npx convex deploy to production
 
 ```sh
 npm run deploy:web:dry    # see what would change
-npm run deploy:web        # checks, export, rsync --delete; Caddy serves it immediately
+npm run deploy:web        # checks, build, rsync --delete; Caddy serves it immediately
 ```
 
 ### Android
@@ -146,6 +148,7 @@ adb install -r dist/note-shote-preview-*.apk
 
 ## How it works
 
+- **The web app** (`web/`) is its own Vite SPA: `NotesPage` (layout and URL hash), `Sidebar` / `SourceMenu`, `NoteList` (paginated views, tag lists and search), `NoteEditor` (same autosave and sync rules as the app), tag dialogs. It imports the backend through the `@convex` alias to `../convex`; strings are in `web/src/lib/strings.ts`.
 - **The app** (`src/`) uses Expo Router, NativeWind and React Native Reusables. The RNR primitives live in `src/components/ui/`, and screens only use the app's own wrappers in `src/components/cmp/cmp-*.tsx` (plus composites built from them: `note-row`, `tag-picker`, `auth-form`). All strings are in `src/lib/strings.ts`.
 - **Convex** (`convex/`) is the entire backend.
   - `schema.ts`: `notes`, `tags`, `noteTags` (the join table mirroring `notes.tagIds`), plus the Convex Auth tables.
