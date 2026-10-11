@@ -15,7 +15,7 @@ import {
   Undo2,
 } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
-import { Platform, Pressable, ScrollView, TextInput, View } from "react-native";
+import { Platform, ScrollView, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -205,11 +205,11 @@ export default function NoteScreen() {
             onFocus={() => n.setFieldFocused("title", true)}
             onBlur={() => n.setFieldFocused("title", false)}
             placeholder={s.titlePlaceholder}
-            editable={!readOnly}
+            // The title is edited together with the body, in edit mode only.
+            editable={editing && !readOnly}
             maxLength={MAX_TITLE_CHARS}
             submitBehavior="blurAndSubmit"
             returnKeyType="next"
-            onSubmitEditing={() => !editing && startEditing()}
             placeholderClassName="text-muted-foreground"
             className={cn(
               "text-foreground px-4 pb-1 pt-4 text-2xl font-bold",
@@ -233,16 +233,11 @@ export default function NoteScreen() {
             />
           ) : (
             <ScrollView className="flex-1" contentContainerClassName="px-4 py-3 pb-12">
-              <Pressable
-                // Tapping the rendered body starts editing on Android.
-                disabled={Platform.OS !== "android" || readOnly}
-                onPress={startEditing}>
-                {n.body ? (
-                  <CmpMarkdown markdown={n.body} />
-                ) : (
-                  <CmpText variant="muted">{n.loaded && !inTrash ? s.emptyBody : ""}</CmpText>
-                )}
-              </Pressable>
+              {n.body ? (
+                <CmpMarkdown markdown={n.body} />
+              ) : (
+                <CmpText variant="muted">{n.loaded && !inTrash ? s.emptyBody : ""}</CmpText>
+              )}
             </ScrollView>
           )}
 
