@@ -176,7 +176,7 @@ single paginated index range; in Notes, descending order puts pinned notes first
 | Search | `search_text` filtered by user only, paginated, best match first; every view |
 | Purge | `by_deleted`, `0 ≤ deletedAt < now − 30 days`, 100 per batch, reschedules while full |
 
-## Editor round-trip
+### Editor round-trip
 
 `EnrichedMarkdownTextInput` (Android) only models paragraphs, H1–H6, single-line nested
 bullet/numbered lists, and bold / italic / underline / strikethrough / links (plus spoilers).
