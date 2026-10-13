@@ -24,7 +24,18 @@ jobs:
     timeout-minutes: 60
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      # 64-bit ARM only (every current phone): a quarter of the native build,
+      # so it fits the runner's disk and finishes sooner.
+      ORG_GRADLE_PROJECT_reactNativeArchitectures: arm64-v8a
     steps:
+      - name: Free disk space
+        # The runner's ~14 GB free runs out during the Gradle build. These
+        # preinstalled toolchains aren't used here.
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/local/lib/node_modules /usr/share/swift
+          sudo docker image prune --all --force >/dev/null || true
+          df -h /
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
@@ -37,14 +48,27 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Cache Gradle
+        # Caches ~/.gradle (dependencies, wrapper, build cache) between runs;
+        # saved only from main. The first run fills it.
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Give Gradle more memory
-        # The default 2 GB heap runs out while merging dex files.
+      - name: Gradle settings
+        # The default 2 GB heap runs out while merging dex files. A public
+        # repo's runner has 4 cores and 16 GB (a private one 2 and 7: use 4g
+        # there). The build cache reuses task outputs from the last run.
         run: |
           mkdir -p ~/.gradle
-          echo "org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g" >> ~/.gradle/gradle.properties
+          cat >> ~/.gradle/gradle.properties <<'PROPS'
+          org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g
+          org.gradle.parallel=true
+          org.gradle.caching=true
+          PROPS
 
       - name: Build APK
         id: build
