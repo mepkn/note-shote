@@ -10,7 +10,7 @@
         "./assets/*"
       ],
       "@convex/*": [
-        "../convex/*"
+        "../backend/convex/*"
       ]
     }
   },

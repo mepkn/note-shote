@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 60
     defaults:
       run:
-        # The Expo app; it imports ../convex but needs only its own install.
+        # The Expo app; it imports ../backend/convex but needs only its own install.
         working-directory: mobile
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}

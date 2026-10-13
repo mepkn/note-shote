@@ -4,10 +4,10 @@ const { withNativeWind } = require("nativewind/metro");
 
 const config = getDefaultConfig(__dirname);
 
-// The backend lives in ../convex and is shared with the web app. Watch it, and
+// The backend lives in ../backend/convex and is shared with the web app. Watch it, and
 // resolve its packages (`convex/server`...) from this app's node_modules, so the
 // app bundles one copy of `convex` and needs no root install (EAS builds).
-const convexDir = path.resolve(__dirname, "../convex");
+const convexDir = path.resolve(__dirname, "../backend/convex");
 config.watchFolders = [...(config.watchFolders ?? []), convexDir];
 const resolveRequest = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {

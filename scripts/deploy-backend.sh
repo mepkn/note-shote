@@ -1,28 +1,27 @@
 #!/usr/bin/env bash
-# Deploys convex/ to the production Convex deployment decisive-mockingbird-534 (project "note-shote").
-# Needs CONVEX_DEPLOY_KEY in .env.prod.local (git-ignored).
+# Deploys backend/convex/ to the production Convex deployment of project "note-shote".
+# Needs CONVEX_DEPLOY_KEY in backend/.env.prod.local (git-ignored; see backend/.env.example).
+#   scripts/deploy-backend.sh            checks, then deploy
+#   DRY_RUN=1 scripts/deploy-backend.sh  preview only: nothing is deployed
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source scripts/load-env.sh
 
-if [ ! -f .env.prod.local ]; then
-  echo "Missing .env.prod.local. Copy .env.example and fill in CONVEX_DEPLOY_KEY." >&2
-  exit 1
-fi
-# Read KEY=VALUE lines literally (values such as deploy keys contain "|", so the
-# file is not sourced as shell). Surrounding quotes are stripped.
-while IFS= read -r line || [ -n "$line" ]; do
-  case "$line" in ''|\#*) continue ;; esac
-  key="${line%%=*}"
-  value="${line#*=}"
-  value="${value%\"}"; value="${value#\"}"; value="${value%\'}"; value="${value#\'}"
-  export "$key=$value"
-done < .env.prod.local
-: "${CONVEX_DEPLOY_KEY:?CONVEX_DEPLOY_KEY is not set in .env.prod.local}"
-# .env.local points `convex` at the local dev backend; don't let it win.
+load_env backend/.env.prod.local
+: "${CONVEX_DEPLOY_KEY:?CONVEX_DEPLOY_KEY is not set in backend/.env.prod.local}"
+# backend/.env.local points `convex` at the local dev backend; don't let it win.
 unset CONVEX_DEPLOYMENT
 
 echo "› Checks"
-npm run check
+scripts/check.sh
+
+cd backend
+if [ -n "${DRY_RUN:-}" ]; then
+  echo "› Backend (dry run)"
+  npx convex deploy --dry-run
+  echo "Dry run: nothing was deployed."
+  exit 0
+fi
 
 echo "› Deploying to production"
 npx convex deploy -y

@@ -9,7 +9,7 @@ import "./index.css";
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL as string | undefined;
 if (!convexUrl) {
-  throw new Error("VITE_CONVEX_URL is not set. Run `npm run backend` in the repo root to create ../.env.local.");
+  throw new Error("VITE_CONVEX_URL is not set. Run `npm run dev` in backend/ to create backend/.env.local.");
 }
 
 /**

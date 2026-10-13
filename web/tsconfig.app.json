@@ -15,7 +15,7 @@
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
-    "paths": { "@/*": ["./src/*"], "@convex/*": ["../convex/*"] },
+    "paths": { "@/*": ["./src/*"], "@convex/*": ["../backend/convex/*"] },
 
     /* Linting */
     "strict": true,
