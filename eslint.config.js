@@ -1,10 +1,24 @@
-// https://docs.expo.dev/guides/using-eslint/
-const { defineConfig } = require('eslint/config');
-const expoConfig = require("eslint-config-expo/flat");
+import js from '@eslint/js'
+import globals from 'globals'
+import tseslint from 'typescript-eslint'
+import { defineConfig, globalIgnores } from 'eslint/config'
 
-module.exports = defineConfig([
-  expoConfig,
+// The backend and scripts. The apps in mobile/ and web/ have their own configs.
+export default defineConfig([
+  globalIgnores(['dist', 'mobile', 'web', 'convex/_generated']),
   {
-    ignores: ["dist/*", "web/*"],
-  }
-]);
+    files: ['**/*.{ts,tsx}'],
+    extends: [js.configs.recommended, tseslint.configs.recommended],
+    languageOptions: {
+      globals: globals.node,
+    },
+    rules: {
+      // `_`-prefixed names and rest siblings mark values left out on purpose,
+      // e.g. `({ content: _content, ...summary }) => summary`.
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', ignoreRestSiblings: true },
+      ],
+    },
+  },
+])

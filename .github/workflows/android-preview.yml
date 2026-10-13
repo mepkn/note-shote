@@ -22,6 +22,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    defaults:
+      run:
+        # The Expo app; it imports ../convex but needs only its own install.
+        working-directory: mobile
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       # 64-bit ARM only (every current phone): a quarter of the native build,
@@ -31,6 +35,8 @@ jobs:
       - name: Free disk space
         # The runner's ~14 GB free runs out during the Gradle build. These
         # preinstalled toolchains aren't used here.
+        # Runs before checkout, so mobile/ doesn't exist yet.
+        working-directory: .
         run: |
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/local/lib/node_modules /usr/share/swift
           sudo docker image prune --all --force >/dev/null || true
@@ -42,6 +48,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+          cache-dependency-path: mobile/package-lock.json
 
       - uses: actions/setup-java@v4
         with:
@@ -85,6 +92,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ github.event.repository.name }}-preview-${{ steps.build.outputs.short }}
-          path: ${{ steps.build.outputs.apk }}
+          path: mobile/${{ steps.build.outputs.apk }}
           retention-days: 90
           if-no-files-found: error

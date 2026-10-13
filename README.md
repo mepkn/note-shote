@@ -4,7 +4,7 @@ A private Markdown notes app: many notes, each with a title, a Markdown body and
 live between an Android phone and the web at <https://note-shote.pknspace.com>. Only
 allowlisted emails can sign in.
 
-Platforms: web (a separate Vite app in `web/`, on the VPS) and Android (sideloaded APK).
+Platforms: web (a separate Vite app in `web/`, on the VPS) and Android (Expo in `mobile/`, sideloaded APK).
 
 ## Features
 
@@ -41,12 +41,15 @@ Requires Node 22.18+ (`.nvmrc` pins 22).
 ### 1. Install and run Convex locally
 
 ```sh
-npm install               # don't use --ignore-scripts: enriched-markdown's postinstall fetches native assets
+npm install               # backend: convex and its tests
+npm run mobile:install    # the Android app's own node_modules; don't use --ignore-scripts: enriched-markdown's postinstall fetches native assets
 npm run web:install       # the web app's own node_modules
+printf 'EXPO_PUBLIC_CONVEX_URL=\nEXPO_PUBLIC_CONVEX_SITE_URL=\n' > .env.local   # first time only
 npx convex dev            # first run: choose a local deployment (no account needed)
 ```
 
-This writes `EXPO_PUBLIC_CONVEX_URL` to `.env.local`. Keep it running; it redeploys whenever `convex/` changes.
+This writes `EXPO_PUBLIC_CONVEX_URL` to `.env.local` (the empty line tells it the name; Expo isn't
+in the root `package.json`, so it would otherwise write `CONVEX_URL`). Both apps read this one file. Keep it running; it redeploys whenever `convex/` changes.
 
 > **Phone vs. local backend:** `127.0.0.1` on a phone is the phone itself.
 > - **Android emulator:** set `EXPO_PUBLIC_CONVEX_URL=http://10.0.2.2:<port>`.
@@ -72,7 +75,7 @@ The Android editor is a native module, so Android needs a **development build** 
 ```sh
 npm run web:dev                  # web app on http://localhost:5173
 npm run android                  # build and install a development build on a USB phone
-npx expo start --dev-client      # Metro for the development build
+npm start                        # Metro for the development build
 ```
 
 ## Scripts
@@ -80,21 +83,23 @@ npx expo start --dev-client      # Metro for the development build
 | Command | What it does |
 |---|---|
 | `npx convex dev` | Local Convex backend with hot reload |
+| `npm run mobile:install` | Install the Android app's dependencies (`mobile/node_modules`) |
+| `npm start` | Metro for the development build |
 | `npm run web:install` | Install `web/` dependencies |
 | `npm run web:dev` | Vite dev server for the web app (reads `EXPO_PUBLIC_CONVEX_URL` from `.env.local`) |
 | `npm run android` | Build and install the development build on a USB phone |
-| `npm run typecheck` | App and `convex/` typecheck |
-| `npm run lint` | ESLint (Expo config) |
-| `npm test` | convex-test (allowlist, ownership, limits, versions, search, trash, purge, tags) and the editor-compat detector |
-| `npm run check` | Typecheck, lint and tests, then the web app's typecheck and lint |
-| `npm run icons` | Regenerate the app icon and splash images |
+| `npm run typecheck` | `convex/` typecheck |
+| `npm run lint` | ESLint for the backend and scripts |
+| `npm test` | convex-test (allowlist, ownership, limits, versions, search, trash, purge, tags) |
+| `npm run check` | Typecheck, lint and tests for the backend, then `mobile/` (incl. the editor-compat detector tests) and `web/` |
+| `npm run icons` | Regenerate the app icon and splash images in `mobile/assets/images` |
 | `npm run deploy:backend` | Checks, then deploys `convex/` to production |
 | `npm run deploy:web` | Checks, builds `web/` with the production URL, rsyncs `web/dist/` to the VPS |
 | `npm run deploy:web:dry` | The same, but rsync only shows what would change |
 | `npm run build:android:preview` | Installable APK, built on EAS cloud |
-| `npm run build:android:preview:local` | The same APK, built on this Mac into `dist/` |
+| `npm run build:android:preview:local` | The same APK, built on this Mac into `mobile/dist/` |
 | `npm run build:android:production` | Play Store AAB on EAS cloud |
-| `npm run build:android:production:local` | The same AAB, built locally into `dist/` |
+| `npm run build:android:production:local` | The same AAB, built locally into `mobile/dist/` |
 | `npm run eas -- <args>` | Any other `eas` command as the personal account |
 
 ## Deployment
@@ -143,20 +148,20 @@ npm run deploy:web        # checks, build, rsync --delete; Caddy serves it immed
 
 ```sh
 npm run build:android:preview:local
-adb install -r dist/note-shote-preview-*.apk
+adb install -r mobile/dist/note-shote-preview-*.apk
 ```
 
 ## How it works
 
 - **The web app** (`web/`) is its own Vite SPA: `NotesPage` (layout and URL hash), `Sidebar` / `SourceMenu`, `NoteList` (paginated views, tag lists and search), `NoteEditor` (same autosave and sync rules as the app), tag dialogs. It imports the backend through the `@convex` alias to `../convex`; strings are in `web/src/lib/strings.ts`.
-- **The app** (`src/`) uses Expo Router, NativeWind and React Native Reusables. The RNR primitives live in `src/components/ui/`, and screens only use the app's own wrappers in `src/components/cmp/cmp-*.tsx` (plus composites built from them: `note-row`, `tag-picker`, `auth-form`). All strings are in `src/lib/strings.ts`.
+- **The Android app** (`mobile/`, own `package.json`) uses Expo Router, NativeWind and React Native Reusables. The RNR primitives live in `mobile/src/components/ui/`, and screens only use the app's own wrappers in `mobile/src/components/cmp/cmp-*.tsx` (plus composites built from them: `note-row`, `tag-picker`, `auth-form`). All strings are in `mobile/src/lib/strings.ts`. It imports the backend through the `@convex` alias; `mobile/metro.config.js` watches `../convex` and resolves its packages from `mobile/node_modules`, so EAS builds need only the `mobile/` install. Its scripts load the root `.env.local` with `node --env-file-if-exists`.
 - **Convex** (`convex/`) is the entire backend.
   - `schema.ts`: `notes`, `tags`, `noteTags` (the join table mirroring `notes.tagIds`), plus the Convex Auth tables.
   - `auth.ts`: Convex Auth with the Password provider. `profile()` runs for sign-up and sign-in before anything is stored and refuses emails not in `ALLOWED_EMAILS` with a generic `notAllowed`. `lib/access.ts` `requireUserId` re-checks the list on every call, so removing an email also ends that user's sessions. `getOwnedNote` / `getOwnedTag` give the same error for missing and foreign ids.
   - `notes.ts`: list, byTag, search, get, create, save (last write wins; `version` bumps, a stale `baseVersion` still saves), setTags, setPinned, setArchived, trash, restore, deleteForever, emptyTrash, and the internal `purgeTrash` run daily by `crons.ts`. `searchText` (`title + "\n" + body`) is rewritten on every save.
   - `tags.ts`: list (with note counts), create, rename, remove. Names are trimmed and unique per user ignoring case. Counts are `tags.noteCount`, kept in step by `lib/tagLinks.ts` (every `noteTags` insert and delete goes through it), so listing tags never counts join rows. Removing a tag deletes it at once and clears its join rows and note `tagIds` in batches of 100.
   - `users.ts`: `me`, for the email in Settings.
-- **Sync** (`src/lib/use-note.ts`). Edits are saved 500 ms after typing stops, and immediately when a field loses focus. A subscription result is applied only while neither the title nor the body is focused and there are no unsaved or in-flight edits, so a remote value never lands in a focused editor; results older than the last saved version are ignored. `/note` without an id creates the note on the first save.
+- **Sync** (`mobile/src/lib/use-note.ts`). Edits are saved 500 ms after typing stops, and immediately when a field loses focus. A subscription result is applied only while neither the title nor the body is focused and there are no unsaved or in-flight edits, so a remote value never lands in a focused editor; results older than the last saved version are ignored. `/note` without an id creates the note on the first save.
 - **Auth tokens** are kept in `expo-secure-store` on Android and `localStorage` on web.
 
 ### Index design: pinned in the index
@@ -185,7 +190,7 @@ single paginated index range; in Notes, descending order puts pinned notes first
 bullet/numbered lists, and bold / italic / underline / strikethrough / links (plus spoilers).
 Loading Markdown into it parses with md4c and keeps only those; `getMarkdown()` serializes them back.
 
-`src/lib/roundtrip-sample.ts` covers every GFM feature, and the dev-only `/roundtrip` screen loads
+`mobile/src/lib/roundtrip-sample.ts` covers every GFM feature, and the dev-only `/roundtrip` screen loads
 it into the input, serializes it and shows each line before → after.
 
 | Feature | Survives? |
@@ -205,7 +210,7 @@ it into the input, serializes it and shows each line before → after.
 | Thematic breaks | Dropped |
 | Images | Replaced by their alt text |
 
-**What the app does about it** (`src/lib/markdown-compat.ts`): when you start editing on Android,
+**What the app does about it** (`mobile/src/lib/markdown-compat.ts`): when you start editing on Android,
 a body containing fenced or indented code, tables, blockquotes, task lists, multi-paragraph list
 items, thematic breaks, images, inline code, HTML, backslash escapes or setext headings is edited
 as raw Markdown (the web editor), with a notice. The rich editor also only reports changes while
