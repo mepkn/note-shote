@@ -246,8 +246,8 @@ noteTags: defineTable({                   // mirrors notes.tagIds, as in yaad-di
   - `DEPLOY_HOST`, `DEPLOY_PORT` and `DEPLOY_DIR` live in `.env.prod.local`. Never write the VPS host,
     IP or port into tracked files.
   - `EXPO_PUBLIC_CONVEX_URL` for the web export comes from `.env.prod.local` too.
-  - One-time VPS setup (done by me; needs sudo). `DEPLOY_DIR=/var/www/note-shote`, owned by the
-    deploy user. Block in `/etc/caddy/Caddyfile`:
+  - One-time VPS setup (done; no sudo needed). `DEPLOY_DIR=/var/www/note-shote`, owned by the
+    deploy user. Block in `/etc/caddy/sites/note-shote.caddy`:
     ```caddy
     http://note-shote.pknspace.com:8080 {
           root * /var/www/note-shote
